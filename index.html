@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PHOTOBOOTH // ZERO FOOTPRINT</title>
+  <style>
+    :root {
+      --bg-pure: #000000;
+      --text-primary: #EDEDED;
+      --text-secondary: #737373;
+      --border-subtle: #262626;
+      --border-active: #EDEDED;
+      --font-sans: 'Helvetica Neue', Helvetica, Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-pure);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      height: 100dvh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    button {
+      background: none;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      padding: 6px 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+    }
+
+    button:active {
+      background-color: #1A1A1A;
+    }
+
+    button.active {
+      border-color: var(--border-active);
+      background-color: var(--text-primary);
+      color: var(--bg-pure);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* ================= FLASH OVERLAY ================= */
+    #flash-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: #FFFFFF;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 9999;
+      transition: opacity 0.04s linear;
+    }
+
+    #flash-overlay.active-white {
+      opacity: 1;
+    }
+
+    /* ================= CAMERA SCREEN ================= */
+    .cam-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      height: 60px;
+      z-index: 10;
+    }
+
+    .cam-header.hidden-during-shoot {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .cam-header-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .viewfinder-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      position: relative;
+    }
+
+    .viewfinder-box {
+      width: 100%;
+      max-width: 420px;
+      aspect-ratio: 4 / 3;
+      background-color: #0A0A0A;
+      border: 1px solid var(--border-subtle);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    video#camera-stream {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.25s ease;
+    }
+
+    #permission-msg {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #000000;
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      color: var(--text-secondary);
+    }
+
+    #countdown-display {
+      position: absolute;
+      font-size: 84px;
+      font-weight: 300;
+      color: #FFFFFF;
+      text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+      z-index: 20;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cam-footer {
+      height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding-bottom: 16px;
+    }
+
+    .shutter-btn {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      border: 2px solid #FFFFFF;
+      padding: 4px;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .shutter-btn-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: #FFFFFF;
+      transition: transform 0.1s;
+    }
+
+    .shutter-btn:active .shutter-btn-inner {
+      transform: scale(0.92);
+    }
+
+    #cancel-shoot-btn {
+      display: none;
+      padding: 10px 24px;
+      border-color: #EDEDED;
+      font-size: 12px;
+    }
+
+    /* ================= RESULT SCREEN ================= */
+    .res-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      height: 60px;
+      border-bottom: 1px solid #141414;
+    }
+
+    .preview-stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    #paper-card {
+      padding: 14px 14px 20px 14px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.2s, border-color 0.2s;
+      max-height: 100%;
+      position: relative;
+    }
+
+    /* Layouts */
+    #paper-card.layout-strip {
+      width: 170px;
+    }
+
+    #paper-card.layout-grid {
+      width: 290px;
+      padding: 16px;
+    }
+
+    #paper-card.layout-dual {
+      width: 280px;
+      flex-direction: row;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .slots-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    #paper-card.layout-grid .slots-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .dual-column {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .photo-slot {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background-color: #111;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .photo-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .paper-footer {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+    }
+
+    .stamp-date {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+    }
+
+    .stamp-barcode {
+      font-family: 'Courier New', monospace;
+      letter-spacing: -1px;
+      font-weight: 700;
+    }
+
+    .frame-deco-label {
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      font-size: 7px;
+      letter-spacing: 0.12em;
+      opacity: 0.7;
+      text-transform: uppercase;
+    }
+
+    /* Controls Dock */
+    .controls-dock {
+      border-top: 1px solid #141414;
+      padding: 12px 16px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background-color: #000000;
+    }
+
+    .cat-tabs, .filter-scroll {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .cat-tabs::-webkit-scrollbar, .filter-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cat-tabs button {
+      border: none;
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      font-size: 10px;
+    }
+
+    .cat-tabs button.active {
+      background: none;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--text-primary);
+    }
+
+    .filter-scroll button {
+      flex-shrink: 0;
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+
+    .bottom-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .stamp-toggles {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ================= FRAME GALLERY MODAL ================= */
+    #gallery-modal {
+      position: fixed;
+      inset: 0;
+      background-color: #000000;
+      z-index: 500;
+      display: none;
+      flex-direction: column;
+    }
+
+    #gallery-modal.active {
+      display: flex;
+    }
+
+    .gallery-grid {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .frame-item-card {
+      border: 1px solid var(--border-subtle);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .frame-item-card.selected {
+      border-color: #FFFFFF;
+    }
+
+    .mini-swatch {
+      width: 48px;
+      height: 76px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 4px;
+    }
+
+    .mini-swatch-slot {
+      width: 100%;
+      height: 12px;
+      background-color: rgba(0, 0, 0, 0.25);
+    }
+
+    .frame-item-title {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- FULLSCREEN SHUTTER FLASH -->
+  <div id="flash-overlay"></div>
+
+  <!-- ================= SCREEN 1: CAMERA ================= -->
+  <div id="camera-screen" class="screen active">
+    <div id="cam-header" class="cam-header">
+      <div class="cam-header-group">
+        <button id="btn-flash">FLASH: OFF</button>
+        <button id="btn-lens">LENS: 1.0X STD</button>
+      </div>
+      <button id="btn-flip">FLIP</button>
+    </div>
+
+    <div class="viewfinder-wrapper">
+      <div class="viewfinder-box">
+        <video id="camera-stream" autoplay playsinline muted></video>
+        <div id="countdown-display"></div>
+        <div id="permission-msg">
+          <span>CAMERA ACCESS REQUIRED</span>
+          <button id="btn-retry-cam">RETRY CAMERA</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cam-footer">
+      <button id="btn-mirror">MIRROR: ON</button>
+      <button id="btn-shutter" class="shutter-btn" aria-label="Shutter">
+        <div class="shutter-btn-inner"></div>
+      </button>
+      <button id="btn-cancel-shoot">CANCEL</button>
+    </div>
+  </div>
+
+  <!-- ================= SCREEN 2: RESULT ================= -->
+  <div id="result-screen" class="screen">
+    <div class="res-header">
+      <button id="btn-new">NEW</button>
+      <button id="btn-save">SAVE</button>
+    </div>
+
+    <div class="preview-stage">
+      <div id="paper-card" class="layout-strip">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+
+    <div class="controls-dock">
+      <div class="cat-tabs" id="filter-cats">
+        <button class="active" data-cat="ALL">ALL</button>
+        <button data-cat="CCD">CCD</button>
+        <button data-cat="FILM">FILM</button>
+        <button data-cat="B&W">B&W</button>
+        <button data-cat="FLASH">FLASH</button>
+        <button data-cat="MOOD">MOOD</button>
+      </div>
+
+      <div class="filter-scroll" id="filter-list">
+        <!-- 30 Filters populated dynamically -->
+      </div>
+
+      <div class="bottom-actions">
+        <button id="btn-open-gallery">FRAME GALLERY</button>
+        <div class="stamp-toggles">
+          <button id="toggle-date" class="active">DATE: ON</button>
+          <button id="toggle-barcode" class="active">CODE: ON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: FRAME GALLERY ================= -->
+  <div id="gallery-modal">
+    <div class="res-header">
+      <button id="btn-close-gallery">CLOSE</button>
+      <span style="font-size: 11px; letter-spacing: 0.1em;">SELECT FRAME (20)</span>
+      <div style="width: 54px;"></div>
+    </div>
+    <div class="controls-dock" style="border-top: none; border-bottom: 1px solid #141414; padding-bottom: 10px;">
+      <div class="cat-tabs" id="frame-cats">
+        <button class="active" data-cat="ALL">ALL</button>
+        <button data-cat="CLASSIC">CLASSIC</button>
+        <button data-cat="CUTE">CUTE</button>
+        <button data-cat="SCRAPBOOK">SCRAPBOOK</button>
+        <button data-cat="GRID">GRID & DUAL</button>
+      </div>
+    </div>
+    <div class="gallery-grid" id="gallery-grid">
+      <!-- 20 Frames populated dynamically -->
+    </div>
+  </div>
+
+  <script>
+    /* ================= DATA: 30 HIGH-SPAN FILTERS ================= */
+    const FILTERS = [
+      // CCD
+      { id: 'CCD-COOL', cat: 'CCD', css: 'contrast(1.35) saturate(1.25) brightness(1.08) hue-rotate(190deg)', tint: 'rgba(0, 180, 255, 0.16)' },
+      { id: 'CCD-WARM', cat: 'CCD', css: 'contrast(1.25) saturate(1.4) brightness(1.06) sepia(0.35) hue-rotate(-15deg)', tint: 'rgba(255, 160, 120, 0.14)' },
+      { id: 'CYBER-Y2K', cat: 'CCD', css: 'contrast(1.6) saturate(1.8) brightness(1.05) hue-rotate(240deg)', tint: 'rgba(130, 80, 255, 0.18)' },
+      { id: 'MINI-DV', cat: 'CCD', css: 'contrast(1.45) saturate(0.75) brightness(0.96) hue-rotate(15deg)', tint: 'rgba(40, 220, 190, 0.12)' },
+      { id: 'DIGI-VIBE', cat: 'CCD', css: 'contrast(1.5) saturate(1.95) brightness(1.04)', tint: 'rgba(255, 255, 255, 0.05)' },
+      { id: 'WEBCAM-00', cat: 'CCD', css: 'contrast(1.15) saturate(0.6) brightness(1.12) blur(0.3px)', tint: 'rgba(180, 200, 210, 0.15)' },
+      // FILM
+      { id: 'KODA-GOLD', cat: 'FILM', css: 'contrast(1.3) saturate(1.55) sepia(0.45) hue-rotate(-10deg) brightness(1.05)', tint: 'rgba(255, 195, 0, 0.18)' },
+      { id: 'FUJI-SUPER', cat: 'FILM', css: 'contrast(1.35) saturate(1.45) hue-rotate(115deg) brightness(1.02)', tint: 'rgba(0, 210, 120, 0.15)' },
+      { id: 'PORTRA-400', cat: 'FILM', css: 'contrast(1.12) saturate(0.85) brightness(1.1) sepia(0.18)', tint: 'rgba(255, 220, 195, 0.14)' },
+      { id: 'DISPOSABLE', cat: 'FILM', css: 'contrast(1.55) saturate(1.5) sepia(0.3) hue-rotate(30deg)', tint: 'rgba(30, 140, 90, 0.18)' },
+      { id: 'CINEMA-500', cat: 'FILM', css: 'contrast(1.45) saturate(1.35) hue-rotate(175deg) brightness(0.95)', tint: 'rgba(255, 110, 40, 0.16)' },
+      { id: 'EXPIRED-98', cat: 'FILM', css: 'contrast(1.25) saturate(1.3) sepia(0.55) hue-rotate(290deg)', tint: 'rgba(210, 50, 160, 0.18)' },
+      // B&W
+      { id: 'BW-CLASSIC', cat: 'B&W', css: 'grayscale(1) contrast(1.35) brightness(1.04)', tint: 'transparent' },
+      { id: 'BW-CONTRAST', cat: 'B&W', css: 'grayscale(1) contrast(2.4) brightness(0.95)', tint: 'transparent' },
+      { id: 'BW-GRAIN', cat: 'B&W', css: 'grayscale(1) contrast(1.85) brightness(0.9)', tint: 'rgba(255,255,255,0.06)' },
+      { id: 'BW-SILVER', cat: 'B&W', css: 'grayscale(1) contrast(1.5) brightness(1.12)', tint: 'rgba(160, 210, 255, 0.16)' },
+      { id: 'BW-SEPIA', cat: 'B&W', css: 'grayscale(1) sepia(0.85) contrast(1.45) brightness(0.96)', tint: 'rgba(150, 95, 40, 0.15)' },
+      { id: 'BW-NOIR', cat: 'B&W', css: 'grayscale(1) contrast(2.1) brightness(0.8)', tint: 'transparent' },
+      // FLASH
+      { id: 'FLASH-HARD', cat: 'FLASH', css: 'contrast(1.75) saturate(1.15) brightness(1.25)', tint: 'rgba(255, 255, 255, 0.12)' },
+      { id: 'FLASH-PARTY', cat: 'FLASH', css: 'contrast(1.6) saturate(1.85) brightness(1.15) sepia(0.25)', tint: 'rgba(255, 180, 50, 0.18)' },
+      { id: 'FLASH-BLEACH', cat: 'FLASH', css: 'contrast(1.9) saturate(0.45) brightness(1.08)', tint: 'rgba(180, 195, 200, 0.14)' },
+      { id: 'GLOW-MIST', cat: 'FLASH', css: 'contrast(1.1) saturate(1.25) brightness(1.22)', tint: 'rgba(255, 240, 245, 0.2)' },
+      { id: 'PALE-ICE', cat: 'FLASH', css: 'contrast(1.2) saturate(0.35) brightness(1.25) hue-rotate(185deg)', tint: 'rgba(200, 235, 255, 0.22)' },
+      { id: 'NEON-GLOW', cat: 'FLASH', css: 'contrast(1.65) saturate(2.1) hue-rotate(280deg) brightness(1.05)', tint: 'rgba(255, 0, 170, 0.18)' },
+      // MOOD
+      { id: 'PASTEL-PEACH', cat: 'MOOD', css: 'contrast(1.08) saturate(1.35) brightness(1.15) sepia(0.25) hue-rotate(-25deg)', tint: 'rgba(255, 165, 185, 0.22)' },
+      { id: 'MATCHA-MIST', cat: 'MOOD', css: 'contrast(1.15) saturate(1.25) brightness(1.08) hue-rotate(75deg)', tint: 'rgba(140, 210, 130, 0.2)' },
+      { id: 'SMOKE-BLUE', cat: 'MOOD', css: 'contrast(1.35) saturate(0.75) brightness(0.92) hue-rotate(205deg)', tint: 'rgba(55, 105, 165, 0.24)' },
+      { id: 'AMBER-SUN', cat: 'MOOD', css: 'contrast(1.45) saturate(1.75) sepia(0.65) hue-rotate(-20deg)', tint: 'rgba(255, 95, 20, 0.24)' },
+      { id: 'TOY-PLASTIC', cat: 'MOOD', css: 'contrast(1.7) saturate(2.2) hue-rotate(45deg)', tint: 'rgba(255, 230, 0, 0.15)' },
+      { id: 'RAW-CLEAN', cat: 'MOOD', css: 'none', tint: 'transparent' }
+    ];
+
+    /* ================= DATA: 20 4-SLOT FRAMES ================= */
+    const FRAMES = [
+      // CLASSIC (1x4 Strip)
+      { id: 'STRIP-WHITE', cat: 'CLASSIC', layout: 'strip', bg: '#F7F8FA', text: '#2A2A2A', date: '#FF6B00', deco: 'STANDARD ARCHIVE' },
+      { id: 'STRIP-OBSIDIAN', cat: 'CLASSIC', layout: 'strip', bg: '#1C1C1E', text: '#D1D1D6', date: '#FF9500', deco: 'OBSIDIAN EDITION' },
+      { id: 'STRIP-OATMEAL', cat: 'CLASSIC', layout: 'strip', bg: '#F2EDE4', text: '#4A4238', date: '#C85A17', deco: 'UNBLEACHED COTTON' },
+      { id: 'STRIP-SILVER', cat: 'CLASSIC', layout: 'strip', bg: '#D2D6DC', text: '#1F2937', date: '#000000', deco: 'ALUMINUM 90S' },
+      { id: 'STRIP-SAGE', cat: 'CLASSIC', layout: 'strip', bg: '#9AA89E', text: '#232B25', date: '#FF5722', deco: 'SAGE BOTANICAL' },
+      { id: 'STRIP-BROWN', cat: 'CLASSIC', layout: 'strip', bg: '#2B2625', text: '#E8E3DC', date: '#E09F3E', deco: 'DARK ROAST UMBER' },
+      // CUTE (1x4 Strip)
+      { id: 'DOODLE-DAISY', cat: 'CUTE', layout: 'strip', bg: '#FFFDF5', text: '#5C5346', date: '#E69F00', deco: '* DAISY * FLORA *' },
+      { id: 'SWEET-RIBBON', cat: 'CUTE', layout: 'strip', bg: '#FDE8EC', text: '#7A4954', date: '#D9536F', deco: '>< RIBBON >< BOW' },
+      { id: 'TINY-CHERRIES', cat: 'CUTE', layout: 'strip', bg: '#FAF9F6', text: '#6B2D38', date: '#C92A42', deco: 'o-o CHERRY DUO' },
+      { id: 'MINI-HEARTS', cat: 'CUTE', layout: 'strip', bg: '#F5EEF8', text: '#5B4266', date: '#9B59B6', deco: '<3 <3 <3' },
+      { id: 'CLOUDY-BLUE', cat: 'CUTE', layout: 'strip', bg: '#EBF3FA', text: '#3B5978', date: '#2980B9', deco: '( CLOUDY DAY )' },
+      { id: 'CAT-PAW', cat: 'CUTE', layout: 'strip', bg: '#FAF2EB', text: '#6E5544', date: '#D35400', deco: ':: PAW PRINT ::' },
+      // SCRAPBOOK (1x4 Strip)
+      { id: 'WASHI-TAPE', cat: 'SCRAPBOOK', layout: 'strip', bg: '#F3ECE2', text: '#4E443A', date: '#B04A28', deco: '/// WASHI TAPE ///' },
+      { id: 'GINGHAM-BLUE', cat: 'SCRAPBOOK', layout: 'strip', bg: '#DCEAF7', text: '#2C4A66', date: '#1F618D', deco: '# GINGHAM CHECK #' },
+      { id: 'GINGHAM-PINK', cat: 'SCRAPBOOK', layout: 'strip', bg: '#FADCE4', text: '#6E3545', date: '#B03A5B', deco: '# PICNIC CHECK #' },
+      { id: 'PIXEL-TAMAGO', cat: 'SCRAPBOOK', layout: 'strip', bg: '#E8ECE9', text: '#1E2420', date: '#1E2420', deco: '[ 8-BIT PET OS ]' },
+      { id: 'POSTAGE-STAMP', cat: 'SCRAPBOOK', layout: 'strip', bg: '#FCFBF7', text: '#3D3D3D', date: '#C0392B', deco: '[ AIR MAIL 2026 ]' },
+      // GRID & DUAL
+      { id: 'GRID-WHITE-2X2', cat: 'GRID', layout: 'grid', bg: '#F7F8FA', text: '#2A2A2A', date: '#FF6B00', deco: '2X2 SQUARE ARCHIVE' },
+      { id: 'GRID-BLACK-2X2', cat: 'GRID', layout: 'grid', bg: '#1C1C1E', text: '#EDEDED', date: '#FF9500', deco: '2X2 DARK EDITION' },
+      { id: 'DUAL-STRIP-2X4', cat: 'GRID', layout: 'dual', bg: '#F7F8FA', text: '#2A2A2A', date: '#FF6B00', deco: 'TWIN CUT' }
+    ];
+
+    /* ================= STATE ================= */
+    const LENS_MODES = [
+      { label: 'LENS: 1.0X STD', scale: 1.0 },
+      { label: 'LENS: 0.5X WIDE', scale: 0.82 },
+      { label: 'LENS: STUDIO 4:3', scale: 1.18 }
+    ];
+
+    const state = {
+      stream: null,
+      facingMode: 'user',
+      mirror: true,
+      flashOn: false,
+      lensIdx: 0,
+      isShooting: false,
+      abortController: null,
+      captures: [], // 4 DataURLs
+      activeFilter: FILTERS[0],
+      activeFrame: FRAMES[0],
+      showDate: true,
+      showBarcode: true,
+      filterCat: 'ALL',
+      frameCat: 'ALL'
+    };
+
+    /* ================= DOM REFERENCES ================= */
+    const videoEl = document.getElementById('camera-stream');
+    const flashOverlay = document.getElementById('flash-overlay');
+    const countdownEl = document.getElementById('countdown-display');
+    const camHeader = document.getElementById('cam-header');
+    const btnFlash = document.getElementById('btn-flash');
+    const btnLens = document.getElementById('btn-lens');
+    const btnFlip = document.getElementById('btn-flip');
+    const btnMirror = document.getElementById('btn-mirror');
+    const btnShutter = document.getElementById('btn-shutter');
+    const btnCancelShoot = document.getElementById('btn-cancel-shoot');
+    const permMsg = document.getElementById('permission-msg');
+
+    const cameraScreen = document.getElementById('camera-screen');
+    const resultScreen = document.getElementById('result-screen');
+    const paperCard = document.getElementById('paper-card');
+    const filterListEl = document.getElementById('filter-list');
+    const galleryModal = document.getElementById('gallery-modal');
+    const galleryGrid = document.getElementById('gallery-grid');
+
+    /* ================= CAMERA ENGINE ================= */
+    async function initCamera() {
+      permMsg.style.display = 'none';
+      if (state.stream) {
+        state.stream.getTracks().forEach(t => t.stop());
+      }
+      try {
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: state.facingMode,
+            width: { ideal: 1600 },
+            height: { ideal: 1200 }
+          }
+        };
+        state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoEl.srcObject = state.stream;
+        applyViewfinderTransform();
+      } catch (err) {
+        permMsg.style.display = 'flex';
+      }
+    }
+
+    function applyViewfinderTransform() {
+      const mirrorScale = (state.facingMode === 'user' && state.mirror) ? -1 : 1;
+      const lensScale = LENS_MODES[state.lensIdx].scale;
+      videoEl.style.transform = `scaleX(${mirrorScale * lensScale}) scaleY(${lensScale})`;
+    }
+
+    btnFlash.addEventListener('click', () => {
+      state.flashOn = !state.flashOn;
+      btnFlash.textContent = `FLASH: ${state.flashOn ? 'ON' : 'OFF'}`;
+      btnFlash.classList.toggle('active', state.flashOn);
+    });
+
+    btnLens.addEventListener('click', () => {
+      state.lensIdx = (state.lensIdx + 1) % LENS_MODES.length;
+      btnLens.textContent = LENS_MODES[state.lensIdx].label;
+      applyViewfinderTransform();
+    });
+
+    btnFlip.addEventListener('click', () => {
+      state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+      initCamera();
+    });
+
+    btnMirror.addEventListener('click', () => {
+      state.mirror = !state.mirror;
+      btnMirror.textContent = `MIRROR: ${state.mirror ? 'ON' : 'OFF'}`;
+      applyViewfinderTransform();
+    });
+
+    document.getElementById('btn-retry-cam').addEventListener('click', initCamera);
+
+    /* ================= 4-SHOT SEQUENCE ================= */
+    const sleep = (ms, signal) => new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener('abort', () => {
+        clearTimeout(timer);
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true });
+    });
+
+    function grabCleanFrame() {
+      const canvas = document.createElement('canvas');
+      const vw = videoEl.videoWidth || 1200;
+      const vh = videoEl.videoHeight || 900;
+      // Enforce 4:3 crop
+      const targetAspect = 4 / 3;
+      let sw = vw, sh = vh, sx = 0, sy = 0;
+      if (vw / vh > targetAspect) {
+        sw = vh * targetAspect;
+        sx = (vw - sw) / 2;
+      } else {
+        sh = vw / targetAspect;
+        sy = (vh - sh) / 2;
+      }
+
+      canvas.width = 1200;
+      canvas.height = 900;
+      const ctx = canvas.getContext('2d');
+
+      const lensScale = LENS_MODES[state.lensIdx].scale;
+      const mirrorSign = (state.facingMode === 'user' && state.mirror) ? -1 : 1;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(mirrorSign * lensScale, lensScale);
+      ctx.drawImage(videoEl, sx, sy, sw, sh, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+      ctx.restore();
+
+      return canvas.toDataURL('image/jpeg', 0.95);
+    }
+
+    async function startSequence() {
+      if (state.isShooting || !state.stream) return;
+      state.isShooting = true;
+      state.captures = [];
+      state.abortController = new AbortController();
+      const { signal } = state.abortController;
+
+      // UI Lockdown
+      camHeader.classList.add('hidden-during-shoot');
+      btnMirror.style.visibility = 'hidden';
+      btnShutter.style.display = 'none';
+      btnCancelShoot.style.display = 'inline-block';
+
+      try {
+        for (let shot = 0; shot < 4; shot++) {
+          // 3 -> 2 -> 1
+          countdownEl.textContent = '3';
+          await sleep(1000, signal);
+
+          countdownEl.textContent = '2';
+          await sleep(1000, signal);
+
+          countdownEl.textContent = '1';
+          await sleep(650, signal);
+
+          // Pre-flash AE compensation for front camera if FLASH: ON
+          if (state.flashOn && state.facingMode === 'user') {
+            flashOverlay.classList.add('active-white');
+          }
+          await sleep(350, signal);
+
+          // Capture Frame
+          countdownEl.textContent = '';
+          const frameData = grabCleanFrame();
+          state.captures.push(frameData);
+
+          // Universal 160ms white flash feedback confirming capture
+          flashOverlay.classList.add('active-white');
+          await sleep(160, signal);
+          flashOverlay.classList.remove('active-white');
+        }
+
+        finishShooting();
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          resetCameraUI();
+        }
+      }
+    }
+
+    function abortShooting() {
+      if (state.abortController) {
+        state.abortController.abort();
+      }
+      resetCameraUI();
+    }
+
+    function resetCameraUI() {
+      state.isShooting = false;
+      state.captures = [];
+      countdownEl.textContent = '';
+      flashOverlay.classList.remove('active-white');
+      camHeader.classList.remove('hidden-during-shoot');
+      btnMirror.style.visibility = 'visible';
+      btnShutter.style.display = 'flex';
+      btnCancelShoot.style.display = 'none';
+    }
+
+    btnShutter.addEventListener('click', startSequence);
+    btnCancelShoot.addEventListener('click', abortShooting);
+
+    // Background / Visibility Protection
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && state.isShooting) {
+        abortShooting();
+      }
+    });
+    window.addEventListener('blur', () => {
+      if (state.isShooting) {
+        abortShooting();
+      }
+    });
+
+    /* ================= RESULT & PREVIEW RENDERING ================= */
+    function finishShooting() {
+      state.isShooting = false;
+      countdownEl.textContent = '';
+      cameraScreen.classList.remove('active');
+      resultScreen.classList.add('active');
+      renderResultPreview();
+    }
+
+    function getStampDateStr() {
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      return `'${yy} ${mm} ${dd}`;
+    }
+
+    function renderResultPreview() {
+      const f = state.activeFrame;
+      const flt = state.activeFilter;
+
+      paperCard.className = `layout-${f.layout}`;
+      paperCard.style.backgroundColor = f.bg;
+      paperCard.style.color = f.text;
+      paperCard.innerHTML = '';
+
+      if (f.layout === 'dual') {
+        for (let col = 0; col < 2; col++) {
+          const colDiv = document.createElement('div');
+          colDiv.className = 'dual-column';
+          state.captures.forEach(src => {
+            colDiv.appendChild(createSlotElement(src, flt));
+          });
+          colDiv.appendChild(createFooterElement(f));
+          paperCard.appendChild(colDiv);
+        }
+      } else {
+        const decoTop = document.createElement('div');
+        decoTop.className = 'frame-deco-label';
+        decoTop.textContent = f.deco;
+        paperCard.appendChild(decoTop);
+
+        const slotsDiv = document.createElement('div');
+        slotsDiv.className = 'slots-container';
+        state.captures.forEach(src => {
+          slotsDiv.appendChild(createSlotElement(src, flt));
+        });
+        paperCard.appendChild(slotsDiv);
+        paperCard.appendChild(createFooterElement(f));
+      }
+    }
+
+    function createSlotElement(src, flt) {
+      const slot = document.createElement('div');
+      slot.className = 'photo-slot';
+      const img = document.createElement('img');
+      img.src = src;
+      img.style.filter = flt.css;
+      slot.appendChild(img);
+
+      if (flt.tint && flt.tint !== 'transparent') {
+        const tintLayer = document.createElement('div');
+        tintLayer.style.position = 'absolute';
+        tintLayer.style.inset = '0';
+        tintLayer.style.backgroundColor = flt.tint;
+        tintLayer.style.mixBlendMode = 'screen';
+        tintLayer.style.pointerEvents = 'none';
+        slot.appendChild(tintLayer);
+      }
+      return slot;
+    }
+
+    function createFooterElement(frame) {
+      const foot = document.createElement('div');
+      foot.className = 'paper-footer';
+
+      const dateSpan = document.createElement('span');
+      dateSpan.className = 'stamp-date';
+      dateSpan.style.color = frame.date;
+      dateSpan.textContent = state.showDate ? getStampDateStr() : '';
+
+      const codeSpan = document.createElement('span');
+      codeSpan.className = 'stamp-barcode';
+      codeSpan.textContent = state.showBarcode ? '|||||||| 698' : '';
+
+      foot.appendChild(dateSpan);
+      foot.appendChild(codeSpan);
+      return foot;
+    }
+
+    /* ================= FILTER & FRAME UI LISTS ================= */
+    function renderFilterButtons() {
+      filterListEl.innerHTML = '';
+      const filtered = state.filterCat === 'ALL'
+        ? FILTERS
+        : FILTERS.filter(x => x.cat === state.filterCat);
+
+      filtered.forEach(flt => {
+        const btn = document.createElement('button');
+        btn.textContent = flt.id;
+        if (flt.id === state.activeFilter.id) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          state.activeFilter = flt;
+          renderFilterButtons();
+          renderResultPreview();
+        });
+        filterListEl.appendChild(btn);
+      });
+    }
+
+    document.getElementById('filter-cats').addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') return;
+      document.querySelectorAll('#filter-cats button').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      state.filterCat = e.target.dataset.cat;
+      renderFilterButtons();
+    });
+
+    function renderGallery() {
+      galleryGrid.innerHTML = '';
+      const filtered = state.frameCat === 'ALL'
+        ? FRAMES
+        : FRAMES.filter(x => x.cat === state.frameCat);
+
+      filtered.forEach(fr => {
+        const card = document.createElement('div');
+        card.className = 'frame-item-card' + (fr.id === state.activeFrame.id ? ' selected' : '');
+
+        const swatch = document.createElement('div');
+        swatch.className = 'mini-swatch';
+        swatch.style.backgroundColor = fr.bg;
+        for (let i = 0; i < 4; i++) {
+          const s = document.createElement('div');
+          s.className = 'mini-swatch-slot';
+          swatch.appendChild(s);
+        }
+
+        const label = document.createElement('div');
+        label.className = 'frame-item-title';
+        label.textContent = fr.id;
+
+        card.appendChild(swatch);
+        card.appendChild(label);
+        card.addEventListener('click', () => {
+          state.activeFrame = fr;
+          galleryModal.classList.remove('active');
+          renderResultPreview();
+        });
+        galleryGrid.appendChild(card);
+      });
+    }
+
+    document.getElementById('frame-cats').addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') return;
+      document.querySelectorAll('#frame-cats button').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      state.frameCat = e.target.dataset.cat;
+      renderGallery();
+    });
+
+    document.getElementById('btn-open-gallery').addEventListener('click', () => {
+      renderGallery();
+      galleryModal.classList.add('active');
+    });
+
+    document.getElementById('btn-close-gallery').addEventListener('click', () => {
+      galleryModal.classList.remove('active');
+    });
+
+    document.getElementById('toggle-date').addEventListener('click', (e) => {
+      state.showDate = !state.showDate;
+      e.target.textContent = `DATE: ${state.showDate ? 'ON' : 'OFF'}`;
+      e.target.classList.toggle('active', state.showDate);
+      renderResultPreview();
+    });
+
+    document.getElementById('toggle-barcode').addEventListener('click', (e) => {
+      state.showBarcode = !state.showBarcode;
+      e.target.textContent = `CODE: ${state.showBarcode ? 'ON' : 'OFF'}`;
+      e.target.classList.toggle('active', state.showBarcode);
+      renderResultPreview();
+    });
+
+    document.getElementById('btn-new').addEventListener('click', () => {
+      resultScreen.classList.remove('active');
+      cameraScreen.classList.add('active');
+      resetCameraUI();
+    });
+
+    /* ================= 300 DPI HIGH-RES EXPORT ================= */
+    const btnSave = document.getElementById('btn-save');
+
+    function loadImage(src) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = src;
+      });
+    }
+
+    btnSave.addEventListener('click', async () => {
+      if (btnSave.disabled) return;
+      btnSave.disabled = true;
+      btnSave.textContent = 'SAVING...';
+
+      const f = state.activeFrame;
+      const flt = state.activeFilter;
+      const imgs = await Promise.all(state.captures.map(loadImage));
+
+      const exportCanvas = document.createElement('canvas');
+      const ctx = exportCanvas.getContext('2d');
+
+      if (f.layout === 'strip') {
+        exportCanvas.width = 1200;
+        exportCanvas.height = 3600;
+        ctx.fillStyle = f.bg;
+        ctx.fillRect(0, 0, 1200, 3600);
+
+        const pad = 80;
+        const slotW = 1040;
+        const slotH = 780;
+        const gap = 50;
+
+        imgs.forEach((img, idx) => {
+          const y = 110 + idx * (slotH + gap);
+          drawFilteredSlot(ctx, img, pad, y, slotW, slotH, flt);
+        });
+
+        drawExportStamps(ctx, f, 80, 3490, 1120, 3490, 42);
+      } else if (f.layout === 'grid') {
+        exportCanvas.width = 2400;
+        exportCanvas.height = 2400;
+        ctx.fillStyle = f.bg;
+        ctx.fillRect(0, 0, 2400, 2400);
+
+        const pad = 120;
+        const gap = 60;
+        const slotW = (2400 - pad * 2 - gap) / 2;
+        const slotH = slotW * 0.75;
+        const startY = 240;
+
+        imgs.forEach((img, idx) => {
+          const col = idx % 2;
+          const row = Math.floor(idx / 2);
+          const x = pad + col * (slotW + gap);
+          const y = startY + row * (slotH + gap);
+          drawFilteredSlot(ctx, img, x, y, slotW, slotH, flt);
+        });
+
+        drawExportStamps(ctx, f, 120, 2240, 2280, 2240, 48);
+      } else if (f.layout === 'dual') {
+        exportCanvas.width = 2400;
+        exportCanvas.height = 3600;
+        ctx.fillStyle = f.bg;
+        ctx.fillRect(0, 0, 2400, 3600);
+
+        for (let c = 0; c < 2; c++) {
+          const offsetX = c * 1200;
+          const pad = 80;
+          const slotW = 1040;
+          const slotH = 780;
+          const gap = 50;
+
+          imgs.forEach((img, idx) => {
+            const y = 110 + idx * (slotH + gap);
+            drawFilteredSlot(ctx, img, offsetX + pad, y, slotW, slotH, flt);
+          });
+
+          drawExportStamps(ctx, f, offsetX + 80, 3490, offsetX + 1120, 3490, 42);
+        }
+      }
+
+      const dataUrl = exportCanvas.toDataURL('image/jpeg', 0.92);
+      const link = document.createElement('a');
+      link.download = `PHOTOBOOTH_${Date.now()}.jpg`;
+      link.href = dataUrl;
+      link.click();
+
+      btnSave.textContent = 'SAVED';
+      setTimeout(() => {
+        btnSave.textContent = 'SAVE';
+        btnSave.disabled = false;
+      }, 1500);
+    });
+
+    function drawFilteredSlot(ctx, img, x, y, w, h, flt) {
+      ctx.save();
+      ctx.filter = flt.css;
+      ctx.drawImage(img, x, y, w, h);
+      ctx.filter = 'none';
+
+      if (flt.tint && flt.tint !== 'transparent') {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = flt.tint;
+        ctx.fillRect(x, y, w, h);
+      }
+      ctx.restore();
+    }
+
+    function drawExportStamps(ctx, frame, leftX, leftY, rightX, rightY, fontSize) {
+      ctx.save();
+      ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+      if (state.showDate) {
+        ctx.fillStyle = frame.date;
+        ctx.textAlign = 'left';
+        ctx.fillText(getStampDateStr(), leftX, leftY);
+      }
+      if (state.showBarcode) {
+        ctx.fillStyle = frame.text;
+        ctx.textAlign = 'right';
+        ctx.fillText('|||||||| 698', rightX, rightY);
+      }
+      ctx.restore();
+    }
+
+    /* ================= BOOT ================= */
+    renderFilterButtons();
+    initCamera();
+  </script>
+</body>
+</html>
